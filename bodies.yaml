@@ -1,0 +1,13 @@
+bodies:
+  - bennet:
+     color: red
+  - earth:
+     color: blue
+  - venus:
+     color: coral
+  - mercury:
+     color: lightgreen
+  - Sun:
+     color: yellow
+#  - Moon:
+#     color: grey
