@@ -1,6 +1,7 @@
 bodies:
   - bennet:
      color: red
+     velocity: True
   - earth:
      color: blue
   - venus:
@@ -9,5 +10,3 @@ bodies:
      color: lightgreen
   - Sun:
      color: yellow
-#  - Moon:
-#     color: grey
