@@ -1,5 +1,3 @@
-import datetime
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,9 +6,10 @@ import sys
 from scipy import signal
 
 # Plot trajectory, velocity and angles of Bennet comet
-# Compare result with https://theskylive.com/cometbennett-info
+# Compare results with https://theskylive.com/cometbennett-info
 # use NASA API https://ssd.jpl.nasa.gov/horizons/app.html
 # color https://matplotlib.org/stable/gallery/color/named_colors.html
+
 
 class Horizon:
     def __init__(self):
@@ -21,12 +20,15 @@ class Horizon:
         self.v_x = []
         self.v_y = []
         self.v_z = []
+        self.const_conversion = 1.496e+8 # from UA in km
 
-    def _parse_pos_line(self, line):
+    @staticmethod
+    def _parse_pos_line(line):
         sx, sy, sz = line[4:26], line[30:52], line[56:78]
         return float(sx), float(sy), float(sz)
 
-    def _parse_velocity_line(self, line):
+    @staticmethod
+    def _parse_velocity_line(line):
         vx, vy, vz = line[5:26], line[30:52], line[56:78]
         return float(vx), float(vy), float(vz)
 
@@ -40,11 +42,6 @@ class Horizon:
                     break
                 if "A.D." in line:
                     date = line[25:36]
-                    dt = datetime.datetime.strptime(date, '%Y-%b-%d')
-                    #if state_vector == 'position':
-                    #    new_format_date = str(dt.year) + str(dt.month).zfill(2) + str(dt.day).zfill(2)
-                    #    self.dates.append(int(new_format_date))
-                    #else:
                     self.dates.append(date)
                 elif line.startswith(" X =") and (state_vector == 'position'):
                     sx, sy, sz = self._parse_pos_line(line)
@@ -55,7 +52,7 @@ class Horizon:
                     svx, svy, svz = self._parse_velocity_line(line)
                     self.v_x.append(svx * 1731.46)
                     self.v_y.append(svy * 1731.46)
-                    self.v_z.append(svz * 1731.46) # from  AU/day in km/s
+                    self.v_z.append(svz * 1731.46) # from AU/day in km/s
 
     def get_position(self):
         return self.dates, self.x, self.y, self.z
@@ -102,32 +99,24 @@ def calculate_angle(coord_p_1, coord_p_2, coord_p_3):
     vec_p3p2 = p_2 - p_3
 
     # calculate vertex p1
-    cos_p1 = np.dot(vec_p1p2, vec_p1p3) / (np.linalg.norm(vec_p1p2) * np.linalg.norm(vec_p1p3))
+    cos_p1 = np.dot(vec_p1p2, vec_p1p3) / (np.linalg.norm(vec_p1p2, ord=2) * np.linalg.norm(vec_p1p3, ord=2))
     p1_rad = np.arccos(cos_p1)
     p1_deg = np.degrees(p1_rad)
 
     # calculate vertex p2
-    cos_p2 = np.dot(vec_p2p1, vec_p2p3) / (np.linalg.norm(vec_p2p1) * np.linalg.norm(vec_p2p3))
+    cos_p2 = np.dot(vec_p2p1, vec_p2p3) / (np.linalg.norm(vec_p2p1, ord=2) * np.linalg.norm(vec_p2p3, ord=2))
     p2_rad = np.arccos(cos_p2)
     p2_deg = np.degrees(p2_rad)
 
     # calculate vertex p3
-    cos_p3 = np.dot(vec_p3p1, vec_p3p2) / (np.linalg.norm(vec_p3p1) * np.linalg.norm(vec_p3p2))
+    cos_p3 = np.dot(vec_p3p1, vec_p3p2) / (np.linalg.norm(vec_p3p1, ord=2) * np.linalg.norm(vec_p3p2, ord=2))
     p3_rad = np.arccos(cos_p3)
     p3_deg = np.degrees(p3_rad)
     return p1_deg, p2_deg, p3_deg
 
 
-def plotTrajectory (bodies):
-    angles = []
-    angles.append((20,90))
-    angles.append((90, 0))
-    angles.append((45, 45))
-    angles.append((20, 160))
-    angles.append((-5, 20))
-    angles.append((-5, -130))
-    angles.append((20, -90))
-    angles.append((10, -90))
+def plotTrajectory (corpse):
+    angles = [(20, 90), (90, 0), (45, 45), (20, 160), (-5, 20), (-5, -130), (20, -90), (10, -90)]
 
     print(f"Plotting position")
     for angle in angles:
@@ -137,8 +126,8 @@ def plotTrajectory (bodies):
 
         legend_list = []
         print(f"Working with projection angle: {angle}")
-        for body_index in range (0, len(bodies['bodies'])):
-            for body, param in bodies['bodies'][body_index].items():
+        for body_index in range (0, len(corpse['bodies'])):
+            for body, param in corpse['bodies'][body_index].items():
                 print(f"Working on body: {body}")
                 legend_list.append(body)
                 body_lower_name = body.lower()
@@ -177,19 +166,19 @@ def plotTrajectory (bodies):
             ax.set_ylabel('y (UA)', fontsize = 20)
             ax.set_zlabel('z (UA)', fontsize = 20)
 
-        legend = ax.legend(legend_list,  loc = 'center left', fontsize = 20)
+        ax.legend(legend_list,  loc = 'center left', fontsize = 20)
         plt.title(f'Trajectories of the comet Bennet from ({angle[0]}, {angle[1]})', fontsize = 40)
-        plt.savefig(f'Bennet_trajectory_{angle[0]}_{angle[1]}.png')
+        plt.savefig(f'Bennet_trajectory_view_{angle[0]}_{angle[1]}.png')
         plt.show()
 
 
-def plotVelocity (bodies):
+def plotVelocity (cel_bodies):
     print(f"Plotting velocity")
     body = ''
     body_lower_name = ''
     found_target = False
-    for body_index in range(0, len(bodies['bodies'])):
-        for _body, _param in bodies['bodies'][body_index].items():
+    for body_index in range(0, len(cel_bodies['bodies'])):
+        for _body, _param in cel_bodies['bodies'][body_index].items():
             if 'velocity' not in _param:
                 _param['velocity'] = 'False'
             body = _body
@@ -200,7 +189,7 @@ def plotVelocity (bodies):
             break
 
     legend_list = []
-    fig = plt.figure(figsize=(20, 18))
+    plt.figure(figsize=(20, 18))
 
     print(f"Working on body: {body}")
     horizon = Horizon()
@@ -230,19 +219,18 @@ def plotVelocity (bodies):
     plt.xticks(tick_label, tick_label, rotation=45, fontsize='20')
     plt.legend(legend_list,  loc = 'upper right', fontsize = 20)
     plt.grid(True)
-    plt.savefig(f'Comet_Bennet_velocity.png')
+    plt.savefig(f'Bennet_velocity.png')
     plt.show()
 
-def plotAngle (bodies):
+def plotAngle (cel_bodies):
     print(f"Plotting angles")
-    const_conversion = 1.496e+8
     earth_coord_list = []
     sun_coord_list = []
     bennet_coord_list = []
     time = []
 
-    for body_index in range (0, len(bodies['bodies'])):
-        for body, param in bodies['bodies'][body_index].items():
+    for body_index in range (0, len(cel_bodies['bodies'])):
+        for body, param in cel_bodies['bodies'][body_index].items():
             body_lower_name = body.lower()
             if body_lower_name != 'earth' and body_lower_name != 'bennet'and body_lower_name != 'sun':
                 continue
@@ -252,7 +240,7 @@ def plotAngle (bodies):
             pos_body = horizon.get_position()
             time = pos_body[0]
             for i in range(0, len(pos_body[1])):
-                coord = [pos_body[1][i] * const_conversion, pos_body[2][i] * const_conversion, pos_body[3][i] * const_conversion]
+                coord = [pos_body[1][i] * horizon.const_conversion, pos_body[2][i] * horizon.const_conversion, pos_body[3][i] * horizon.const_conversion]
                 if body_lower_name == 'earth':
                     earth_coord_list.append(coord)
                 if body_lower_name == 'bennet':
@@ -260,12 +248,11 @@ def plotAngle (bodies):
                 if body_lower_name == 'sun':
                     sun_coord_list.append(coord)
 
-    fig = plt.figure(figsize=(20, 18))
+    plt.figure(figsize=(20, 18))
     p1_list = []
     p2_list = []
     p3_list = []
-
-    legend_list = ['Angle at vertex E', 'Angle at vertex B', 'Angle at vertex S']
+    legend_list = ['Angle at Bennet vertex', 'Angle at Sun vertex', 'Angle at Earth vertex']
     for i in range(len(earth_coord_list)):
         p1, p2, p3 = calculate_angle(earth_coord_list[i], bennet_coord_list[i], sun_coord_list[i])
         p1_list.append(p1)
@@ -275,13 +262,35 @@ def plotAngle (bodies):
     tick_label = ['.' if (i % 5) != 0 else str(val) for i, val in enumerate(time[0:min_size])]
 
     plt.title(f'Anomalies between Sun, Earth and comet Bennet', fontsize = 40)
-    plt.plot(time[0:min_size], p1_list[0:min_size],'*')
-    plt.plot(time[0:min_size], p2_list[0:min_size],'*')
-    plt.plot(time[0:min_size], p3_list[0:min_size],'*')
+    i = 0
+    for index in range (0, len(time)):
+        if time[index] == '1970-Apr-13':
+            i = index
+            break
+
+    color_list = ['brown', 'blue', 'green']
+    plt.plot(time[0:i], p1_list[0:i], color = color_list[0])
+    plt.plot(time[i:i+1], p1_list[i:i+1], marker = 'X', color = color_list[0])
+    plt.text(time[i], p1_list[i], str(round(p1_list[i],2)) + '°', horizontalalignment = 'right', verticalalignment='baseline')
+    plt.plot(time[i:min_size], p1_list[i:min_size], color = color_list[0])
+
+    plt.plot(time[0:i], p2_list[0:i], color = color_list[1])
+    plt.plot(time[i:i+1], p2_list[i:i+1], marker = 'X', color = color_list[1])
+    plt.text(time[i], p2_list[i], str(round(p2_list[i],2)) + '°', horizontalalignment = 'right', verticalalignment='baseline')
+    plt.plot(time[i:min_size], p2_list[i:min_size], color = color_list[1])
+
+    plt.plot(time[0:i], p3_list[0:i], color = color_list[2])
+    plt.plot(time[i:i+1], p3_list[i:i+1], marker = 'X', color = color_list[2])
+    plt.text(time[i], p3_list[i], str(round(p3_list[i],2)) + '°', horizontalalignment = 'right', verticalalignment='baseline')
+    plt.plot(time[i:min_size], p3_list[i:min_size], color = color_list[2])
+
     plt.xticks(tick_label, tick_label, rotation=45, fontsize='20')
-    plt.legend(legend_list, loc = 'upper right', fontsize = 20)
+    a = plt.legend(legend_list, labelcolor = color_list, loc = 'upper right', fontsize = 20)
+    for item in a.legend_handles:
+        item.set_visible(False)
+
     plt.grid(True)
-    plt.savefig(f'Bennet_Earth_Sun_angle.png')
+    plt.savefig(f'Bennet_Earth_Sun_angles.png')
     plt.show()
 
 
