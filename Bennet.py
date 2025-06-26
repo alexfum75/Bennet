@@ -1,15 +1,14 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import yaml
 import sys
 from scipy import signal
+from utility import readConfig, findComet, calculateAngle
 
 # Plot trajectory, velocity and angles of Bennet comet
 # Compare results with https://theskylive.com/cometbennett-info
 # use NASA API https://ssd.jpl.nasa.gov/horizons/app.html
 # color https://matplotlib.org/stable/gallery/color/named_colors.html
-
 
 class Horizon:
     def __init__(self):
@@ -20,7 +19,8 @@ class Horizon:
         self.v_x = []
         self.v_y = []
         self.v_z = []
-        self.const_conversion = 1.496e+8 # from UA in km
+        self.const_conversion_ua_km = 1.496e+8 # from UA in km
+        self.const_conversion_ua_km_s = 1731.46# from AU/day in km/s
 
     @staticmethod
     def _parse_pos_line(line):
@@ -50,15 +50,12 @@ class Horizon:
                     self.z.append(sz)
                 elif line.startswith(" VX=")and (state_vector == 'velocity'):
                     svx, svy, svz = self._parse_velocity_line(line)
-                    self.v_x.append(svx * 1731.46)
-                    self.v_y.append(svy * 1731.46)
-                    self.v_z.append(svz * 1731.46) # from AU/day in km/s
+                    self.v_x.append(svx * self.const_conversion_ua_km_s)
+                    self.v_y.append(svy * self.const_conversion_ua_km_s)
+                    self.v_z.append(svz * self.const_conversion_ua_km_s)
 
     def get_position(self):
         return self.dates, self.x, self.y, self.z
-
-    def get_velocity(self):
-        return self.dates, self.v_x, self.v_y, self.v_z
 
     def get_module_velocity(self):
         v_square = np.sqrt (np.square(self.v_x) + np.square(self.v_y) + np.square(self.v_z))
@@ -75,44 +72,6 @@ class Horizon:
     def get_module_z_velocity(self):
         v_square = self.v_z
         return self.dates, v_square
-
-def config(filename):
-    _bodies = None
-    with open(filename) as stream:
-        try:
-            _bodies = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
-    return _bodies
-
-def calculate_angle(coord_p_1, coord_p_2, coord_p_3):
-    p_1 = np.array(coord_p_1)
-    p_2 = np.array(coord_p_2)
-    p_3 = np.array(coord_p_3)
-
-    # calculate vectors
-    vec_p1p2 = p_2 - p_1
-    vec_p1p3 = p_3 - p_1
-    vec_p2p1 = p_1 - p_2
-    vec_p2p3 = p_3 - p_2
-    vec_p3p1 = p_1 - p_3
-    vec_p3p2 = p_2 - p_3
-
-    # calculate vertex p1
-    cos_p1 = np.dot(vec_p1p2, vec_p1p3) / (np.linalg.norm(vec_p1p2, ord=2) * np.linalg.norm(vec_p1p3, ord=2))
-    p1_rad = np.arccos(cos_p1)
-    p1_deg = np.degrees(p1_rad)
-
-    # calculate vertex p2
-    cos_p2 = np.dot(vec_p2p1, vec_p2p3) / (np.linalg.norm(vec_p2p1, ord=2) * np.linalg.norm(vec_p2p3, ord=2))
-    p2_rad = np.arccos(cos_p2)
-    p2_deg = np.degrees(p2_rad)
-
-    # calculate vertex p3
-    cos_p3 = np.dot(vec_p3p1, vec_p3p2) / (np.linalg.norm(vec_p3p1, ord=2) * np.linalg.norm(vec_p3p2, ord=2))
-    p3_rad = np.arccos(cos_p3)
-    p3_deg = np.degrees(p3_rad)
-    return p1_deg, p2_deg, p3_deg
 
 
 def plotTrajectory (corpse):
@@ -174,20 +133,7 @@ def plotTrajectory (corpse):
 
 def plotVelocity (cel_bodies):
     print(f"Plotting velocity")
-    body = ''
-    body_lower_name = ''
-    found_target = False
-    for body_index in range(0, len(cel_bodies['bodies'])):
-        for _body, _param in cel_bodies['bodies'][body_index].items():
-            if 'velocity' not in _param:
-                _param['velocity'] = 'False'
-            body = _body
-            body_lower_name = _body.lower()
-            found_target = True
-            break
-        if found_target:
-            break
-
+    body, body_lower_name = findComet(cel_bodies)
     legend_list = []
     plt.figure(figsize=(20, 18))
 
@@ -240,7 +186,7 @@ def plotAngle (cel_bodies):
             pos_body = horizon.get_position()
             time = pos_body[0]
             for i in range(0, len(pos_body[1])):
-                coord = [pos_body[1][i] * horizon.const_conversion, pos_body[2][i] * horizon.const_conversion, pos_body[3][i] * horizon.const_conversion]
+                coord = [pos_body[1][i] * horizon.const_conversion_ua_km, pos_body[2][i] * horizon.const_conversion_ua_km, pos_body[3][i] * horizon.const_conversion_ua_km]
                 if body_lower_name == 'earth':
                     earth_coord_list.append(coord)
                 if body_lower_name == 'bennet':
@@ -254,7 +200,7 @@ def plotAngle (cel_bodies):
     p3_list = []
     legend_list = ['Angle at Bennet vertex', 'Angle at Sun vertex', 'Angle at Earth vertex']
     for i in range(len(earth_coord_list)):
-        p1, p2, p3 = calculate_angle(earth_coord_list[i], bennet_coord_list[i], sun_coord_list[i])
+        p1, p2, p3 = calculateAngle(earth_coord_list[i], bennet_coord_list[i], sun_coord_list[i])
         p1_list.append(p1)
         p2_list.append(p2)
         p3_list.append(p3)
@@ -295,11 +241,10 @@ def plotAngle (cel_bodies):
 
 
 if __name__ == "__main__":
-    bodies = config("bodies.yaml")
+    bodies = readConfig("bodies.yaml")
     if bodies is None:
         sys.exit("Bodies not found.")
 
     plotAngle(bodies)
     plotTrajectory(bodies)
     plotVelocity (bodies)
-    exit(0)

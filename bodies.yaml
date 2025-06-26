@@ -1,7 +1,7 @@
 bodies:
   - bennet:
      color: red
-     velocity: True
+     comet: True
   - earth:
      color: blue
   - venus:
