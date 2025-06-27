@@ -133,40 +133,41 @@ def plotTrajectory (corpse):
 
 def plotVelocity (cel_bodies):
     print(f"Plotting velocity")
-    body, body_lower_name = findComet(cel_bodies)
+    bodies = findComet(cel_bodies)
     legend_list = []
     plt.figure(figsize=(20, 18))
 
-    print(f"Working on body: {body}")
-    horizon = Horizon()
-    horizon.get_ephemeris(f"./Horizons/{body_lower_name}.txt", 'velocity')
+    for body, body_lower_name in bodies.items():
+        print(f"Working on body: {body}")
+        horizon = Horizon()
+        horizon.get_ephemeris(f"./Horizons/{body_lower_name}.txt", 'velocity')
 
-    vel_body = horizon.get_module_velocity()
-    min_size = min(len(vel_body[0]), len(vel_body[1]))
-    plt.plot(vel_body[0][0:min_size], vel_body[1][0:min_size],'X')
-    legend_list.append('|v(x,y,z)| Comet Bennet')
-    plt.title(f'Velocity of comet Bennet', fontsize = 40)
-    plt.xlabel('Date', fontsize = 20)
-    plt.ylabel('Velocity (km/s)', fontsize=20)
-    tick_label = ['X' if (i % 5) != 0 else str(val) for i, val in enumerate(vel_body[0][0:min_size])]
+        vel_body = horizon.get_module_velocity()
+        min_size = min(len(vel_body[0]), len(vel_body[1]))
+        plt.plot(vel_body[0][0:min_size], vel_body[1][0:min_size],'X')
+        legend_list.append('|v(x,y,z)| Comet Bennet')
+        plt.title(f'Velocity of comet Bennet', fontsize = 40)
+        plt.xlabel('Date', fontsize = 20)
+        plt.ylabel('Velocity (km/s)', fontsize=20)
+        tick_label = ['X' if (i % 5) != 0 else str(val) for i, val in enumerate(vel_body[0][0:min_size])]
 
-    vel_x_body = horizon.get_module_x_velocity()
-    plt.plot(vel_x_body[0][0:min_size], vel_x_body[1][0:min_size],'X')
-    legend_list.append('v(x) Comet Bennet')
+        vel_x_body = horizon.get_module_x_velocity()
+        plt.plot(vel_x_body[0][0:min_size], vel_x_body[1][0:min_size],'X')
+        legend_list.append('v(x) Comet Bennet')
 
-    vel_y_body = horizon.get_module_y_velocity()
-    plt.plot(vel_y_body[0][0:min_size], vel_y_body[1][0:min_size],'X')
-    legend_list.append('v(y) Comet Bennet')
+        vel_y_body = horizon.get_module_y_velocity()
+        plt.plot(vel_y_body[0][0:min_size], vel_y_body[1][0:min_size],'X')
+        legend_list.append('v(y) Comet Bennet')
 
-    vel_z_body = horizon.get_module_z_velocity()
-    plt.plot(vel_z_body[0][0:min_size], vel_z_body[1][0:min_size],'X')
-    legend_list.append('v(z) Comet Bennet')
+        vel_z_body = horizon.get_module_z_velocity()
+        plt.plot(vel_z_body[0][0:min_size], vel_z_body[1][0:min_size],'X')
+        legend_list.append('v(z) Comet Bennet')
 
-    plt.xticks(tick_label, tick_label, rotation=45, fontsize='20')
-    plt.legend(legend_list,  loc = 'upper right', fontsize = 20)
-    plt.grid(True)
-    plt.savefig(f'Bennet_velocity.png')
-    plt.show()
+        plt.xticks(tick_label, tick_label, rotation=45, fontsize='20')
+        plt.legend(legend_list,  loc = 'upper right', fontsize = 20)
+        plt.grid(True)
+        plt.savefig(f'{body}_velocity.png')
+        plt.show()
 
 def plotAngle (cel_bodies):
     print(f"Plotting angles")
@@ -243,7 +244,8 @@ def plotAngle (cel_bodies):
 if __name__ == "__main__":
     bodies = readConfig("bodies.yaml")
     if bodies is None:
-        sys.exit("Bodies not found.")
+        print ("Bodies not found.")
+        sys.exit(-1)
 
     plotAngle(bodies)
     plotTrajectory(bodies)
